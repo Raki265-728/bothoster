@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BotHoster — Free Telegram Bot Hosting</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+<style>
+:root{
+  --bg:#0a0e14;--bg2:#0d1117;--card:#161b22;--border:#21262d;
+  --text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;
+  --green:#3fb950;--red:#f85149;--grad:linear-gradient(135deg,#58a6ff,#a371f7);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+
+.bg{position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(circle at 20% 20%,rgba(88,166,255,.15),transparent 40%),
+    radial-gradient(circle at 80% 60%,rgba(163,113,247,.12),transparent 40%),
+    linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:100% 100%,100% 100%,40px 40px,40px 40px;}
+
+nav{position:sticky;top:0;z-index:100;backdrop-filter:blur(14px);
+  background:rgba(13,17,23,.75);border-bottom:1px solid var(--border);padding:14px 0}
+.nav-inner{max-width:1200px;margin:0 auto;padding:0 24px;
+  display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:20px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:10px}
+.logo-ic{width:32px;height:32px;border-radius:8px;background:var(--grad);display:grid;place-items:center;font-size:16px}
+.nav-links{display:flex;gap:24px;align-items:center}
+.nav-links a{color:var(--muted);font-size:14px;font-weight:500}
+.nav-links a:hover{color:var(--text)}
+.nav-btn{padding:8px 18px;background:var(--grad);color:#fff!important;border-radius:8px;font-weight:600}
+
+/* Auth */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:38px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.auth-box h1{font-size:26px;text-align:center;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px}
+.auth-box .sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:24px}
+.auth-tabs{display:flex;gap:6px;background:var(--bg2);padding:5px;border-radius:10px;margin-bottom:20px}
+.auth-tab{flex:1;padding:9px;background:transparent;border:none;color:var(--muted);font-weight:600;font-size:13px;border-radius:6px;cursor:pointer;font-family:inherit}
+.auth-tab.active{background:var(--card);color:var(--text)}
+
+/* Main app */
+.app{max-width:1200px;margin:0 auto;padding:25px 24px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.topbar h2{font-size:22px}
+.user-chip{display:flex;align-items:center;gap:10px;background:var(--card);padding:8px 14px;border-radius:20px;border:1px solid var(--border);font-size:13px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:12px}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;margin-bottom:22px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--accent)}
+.stat.g::before{background:var(--green)}
+.stat.r::before{background:var(--red)}
+.stat .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.stat .val{font-size:26px;font-weight:700;margin-top:4px}
+
+/* Card */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px}
+.card h3{font-size:17px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* Tabs */
+.tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.tab{background:transparent;color:var(--muted);padding:10px 18px;border-radius:8px 8px 0 0;font-size:14px;font-weight:500;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--bg2)}
+.tab-body{display:none}
+.tab-body.active{display:block}
+
+/* Inputs */
+input,textarea,select{width:100%;padding:11px 14px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;transition:.15s;margin-bottom:10px}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{font-family:'JetBrains Mono','Courier New',monospace;resize:vertical;min-height:220px;font-size:13px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+
+/* Buttons */
+button{cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;border:none;border-radius:8px;padding:11px 20px;transition:.15s;background:var(--accent);color:#fff}
+button:hover{background:#3b82d9}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.danger{background:var(--red)}
+button.danger:hover{background:#dc2626}
+button.success{background:var(--green)}
+button.success:hover{background:#16a34a}
+button.secondary{background:var(--bg2);color:var(--text);border:1px solid var(--border)}
+button.sm{padding:7px 12px;font-size:12px}
+.btn-full{width:100%}
+
+/* Bot grid */
+.bot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.bot-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.15s}
+.bot-card:hover{border-color:var(--accent)}
+.bot-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px}
+.bot-name{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:11px;padding:3px 9px;border-radius:12px;font-weight:600;text-transform:uppercase;flex-shrink:0}
+.badge.on{background:rgba(63,185,80,.15);color:var(--green)}
+.badge.off{background:rgba(248,81,73,.15);color:var(--red)}
+.bot-meta{font-size:11px;color:var(--muted);margin-bottom:12px;word-break:break-all}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.actions button{flex:1;min-width:70px}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal.show{display:flex}
+.modal-inner{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:26px;max-width:900px;width:100%;max-height:85vh;overflow:auto;position:relative}
+.modal-close{position:absolute;top:14px;right:14px;width:32px;height:32px;padding:0;border-radius:50%;background:var(--bg2);color:var(--text);display:grid;place-items:center}
+pre{background:var(--bg);padding:16px;border-radius:8px;overflow:auto;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:60vh;border:1px solid var(--border);font-family:'JetBrains Mono',monospace}
+
+/* Toast */
+.toast{position:fixed;bottom:25px;right:25px;padding:14px 20px;border-radius:10px;color:#fff;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);z-index:2000;transform:translateY(120%);transition:.35s;display:flex;gap:10px;align-items:center;max-width:400px}
+.toast.show{transform:translateY(0)}
+.toast.ok{background:var(--green)}
+.toast.err{background:var(--red)}
+.toast.info{background:var(--accent)}
+
+.hidden{display:none!important}
+.empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty .ic{font-size:48px;margin-bottom:14px;opacity:.5}
+
+@media(max-width:768px){
+  .nav-links a:not(.nav-btn){display:none}
+  .app{padding:18px 15px}
+  .actions button{flex:1;min-width:60px;font-size:11px;padding:6px}
+}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<nav>
+  <div class="nav-inner">
+    <a href="/" class="logo"><span class="logo-ic">🤖</span> BotHoster</a>
+    <div class="nav-links" id="navLinks">
+      <a href="#features">Features</a>
+      <a href="#deploy" class="nav-btn">Deploy Now</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════ AUTH SCREEN ═══════ -->
+<div id="authScreen" class="auth-wrap">
+  <div class="auth-box">
+    <h1>🤖 BotHoster</h1>
+    <p class="sub">আপনার Telegram bot 24/7 online রাখুন</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuth('login',this)">Login</button>
+      <button class="auth-tab" onclick="switchAuth('signup',this)">Signup</button>
+    </div>
+
+    <form id="authForm">
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" required>
+      <label>Password</label>
+      <input type="password" id="authPass" placeholder="Min 6 characters" required minlength="6">
+      <button type="submit" class="btn-full" id="authBtn">Login</button>
+    </form>
+    <div id="authMsg" style="margin-top:14px;text-align:center;font-size:13px"></div>
+  </div>
+</div>
+
+<!-- ═══════ MAIN APP ═══════ -->
+<div id="mainApp" class="hidden">
+  <div class="app">
+    <div class="topbar">
+      <h2>📊 Dashboard</h2>
+      <div class="user-chip">
+        <div class="avatar" id="userAvatar">U</div>
+        <span id="userEmail"></span>
+        <button class="sm secondary" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="lbl">Total Bots</div><div class="val" id="statTotal">0</div></div>
+      <div class="stat g"><div class="lbl">Running</div><div class="val" id="statRun">0</div></div>
+      <div class="stat r"><div class="lbl">Stopped</div><div class="val" id="statStop">0</div></div>
+      <div class="stat"><div class="lbl">CPU</div><div class="val" id="statCpu">0%</div></div>
+    </div>
+
+    <div class="card">
+      <h3>🚀 নতুন Bot Deploy করুন</h3>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('paste',this)">📝 Code Paste</button>
+        <button class="tab" onclick="switchTab('upload',this)">📤 File Upload</button>
+      </div>
+
+      <form id="pasteForm" class="tab-body active">
+        <label>Bot Name</label>
+        <input name="name" placeholder="MyFirstBot" required>
+        <label>Bot Token</label>
+        <input name="token" placeholder="123456:ABC-DEF..." required>
+        <label>Admin Chat ID</label>
+        <input name="chat_id" placeholder="123456789" required>
+        <label>Python Code</label>
+        <textarea name="code" required placeholder="import os, telebot
+bot = telebot.TeleBot(os.environ['BOT_TOKEN'])
+
+@bot.message_handler(commands=['start'])
+def start(m):
+    bot.reply_to(m, 'Hello!')
+
+bot.infinity_polling()"></textarea>
+        <button type="submit" class="btn-full success">🚀 Deploy & Start</button>
+      </form>
+
+      <form id="uploadForm" class="tab-body" enctype="multipart/form-data">
+        <label>Bot Name</label>
+        <input name="name" placeholder="MyFirstBot" required>
+        <label>Bot Token</label>
+        <input name="token" placeholder="123456:ABC-DEF..." required>
+        <label>Admin Chat ID</label>
+        <input name="chat_id" placeholder="123456789" required>
+        <label>File (.py, .js, .zip)</label>
+        <input type="file" name="file" accept=".py,.js,.zip,.tar,.gz" required>
+        <button type="submit" class="btn-full success">📤 Upload & Deploy</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>📁 আপনার Bots</h3>
+      <div id="botsContainer">
+        <div class="empty">
+          <div class="ic">📭</div>
+          <p>এখনো কোনো bot নেই। উপরে একটি deploy করুন।</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log modal -->
+<div class="modal" id="logModal">
+  <div class="modal-inner">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h3 style="margin-bottom:14px">📄 Logs</h3>
+    <pre id="logContent">loading...</pre>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toastIcon">✅</span>
+  <span id="toastMsg">Message</span>
+</div>
+
+<script>
+const API = '';   // same origin — backend একই server এ চলবে
+let authMode = 'login';
+
+// ── API helper ──────────────────────────────────────────
+async function api(path, opts={}) {
+  const r = await fetch(API + path, {credentials:'include', ...opts});
+  return r.json();
+}
+
+// ── Toast ───────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastIcon').textContent =
+    type === 'ok' ? '✅' : type === 'err' ? '❌' : 'ℹ️';
+  t.className = 'toast show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 3500);
+}
+
+// ── Auth ────────────────────────────────────────────────
+function switchAuth(mode, btn) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('authBtn').textContent = mode === 'login' ? 'Login' : 'Signup';
+}
+
+document.getElementById('authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('authEmail').value;
+  const password = document.getElementById('authPass').value;
+  const fd = new FormData();
+  fd.append('email', email);
+  fd.append('password', password);
+
+  const url = authMode === 'login' ? '/api/login' : '/api/signup';
+  const r = await fetch(url, {method:'POST', body: fd, credentials:'include'});
+  const d = await r.json();
+
+  if (d.ok) {
+    toast('Welcome!', 'ok');
+    loadApp();
+  } else {
+    document.getElementById('authMsg').textContent = '❌ ' + (d.error || 'Failed');
+  }
+});
+
+async function logout() {
+  await fetch('/api/logout', {method:'POST', credentials:'include'});
+  location.reload();
+}
+
+// ── Load App ────────────────────────────────────────────
+async function loadApp() {
+  const me = await api('/api/me');
+  if (!me.ok) {
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('mainApp').classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+  document.getElementById('userEmail').textContent = me.email;
+  document.getElementById('userAvatar').textContent = me.email[0].toUpperCase();
+
+  loadBots();
+  loadStats();
+  setInterval(loadStats, 5000);
+}
+
+async function loadStats() {
+  const d = await api('/api/stats');
+  if (!d.ok) return;
+  document.getElementById('statTotal').textContent = d.total;
+  document.getElementById('statRun').textContent = d.running;
+  document.getElementById('statStop').textContent = d.stopped;
+  document.getElementById('statCpu').textContent = d.cpu.toFixed(0) + '%';
+}
+
+async function loadBots() {
+  const d = await api('/api/bots');
+  const c = document.getElementById('botsContainer');
+
+  if (!d.ok || !d.bots.length) {
+    c.innerHTML = `<div class="empty"><div class="ic">📭</div><p>এখনো কোনো bot নেই।</p></div>`;
+    return;
+  }
+
+  c.innerHTML = `<div class="bot-grid">${d.bots.map(b => `
+    <div class="bot-card">
+      <div class="bot-head">
+        <div class="bot-name">${escape(b.name)}</div>
+        <span class="badge ${b.running?'on':'off'}">${b.running?'● Running':'● Stopped'}</span>
+      </div>
+      <div class="bot-meta">
+        ID: ${b.id}<br>
+        Type: ${b.type || 'python'} · Created: ${b.created_at?.slice(0,16) || '-'}
+      </div>
+      <div class="actions">
+        ${b.running
+          ? `<button class="danger sm" onclick="ctrl('${b.id}','stop')">⏹ Stop</button>`
+          : `<button class="success sm" onclick="ctrl('${b.id}','start')">▶️ Start</button>`}
+        <button class="secondary sm" onclick="ctrl('${b.id}','restart')">🔁</button>
+        <button class="secondary sm" onclick="showLogs('${b.id}')">📄</button>
+        <button class="danger sm" onclick="delBot('${b.id}')">🗑</button>
+      </div>
+    </div>
+  `).join('')}</div>`;
+}
+
+function escape(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Deploy ──────────────────────────────────────────────
+document.getElementById('pasteForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = '⏳ Deploying...';
+
+  const fd = new FormData(e.target);
+  const r = await fetch('/api/deploy', {method:'POST', body: fd, credentials:'include'});
+  const d = await r.json();
+
+  btn.disabled = false; btn.textContent = '🚀 Deploy & Start';
+
+  if (d.ok) { toast('Bot deployed!', 'ok'); e.target.reset(); loadBots(); loadStats(); }
+  else toast(d.error || 'Failed', 'err');
+});
+
+document.getElementById('uploadForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = '⏳ Uploading...';
+
+  const fd = new FormData(e.target);
+  const r = await fetch('/api/upload', {method:'POST', body: fd, credentials:'include'});
+  const d = await r.json();
+
+  btn.disabled = false; btn.textContent = '📤 Upload & Deploy';
+
+  if (d.ok) { toast('Uploaded!', 'ok'); e.target.reset(); loadBots(); loadStats(); }
+  else toast(d.error || 'Failed', 'err');
+});
+
+// ── Bot controls ────────────────────────────────────────
+async function ctrl(id, action) {
+  toast('⏳ ' + action + '...', 'info');
+  const r = await fetch(`/api/bot/${id}/${action}`, {method:'POST', credentials:'include'});
+  const d = await r.json();
+  if (d.ok) { toast('✅ ' + action + ' done', 'ok'); loadBots(); loadStats(); }
+  else toast(d.error || 'Failed', 'err');
+}
+
+async function delBot(id) {
+  if (!confirm('এই bot delete করবেন?')) return;
+  const r = await fetch(`/api/bot/${id}/delete`, {method:'POST', credentials:'include'});
+  const d = await r.json();
+  if (d.ok) { toast('Deleted', 'ok'); loadBots(); loadStats(); }
+  else toast(d.error || 'Failed', 'err');
+}
+
+async function showLogs(id) {
+  const modal = document.getElementById('logModal');
+  document.getElementById('logContent').textContent = 'loading...';
+  modal.classList.add('show');
+
+  const r = await fetch(`/api/bot/${id}/logs`, {credentials:'include'});
+  const d = await r.json();
+  document.getElementById('logContent').textContent = d.logs || '(empty)';
+}
+
+function closeModal() { document.getElementById('logModal').classList.remove('show'); }
+
+// ── Tab switch ──────────────────────────────────────────
+function switchTab(which, btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('pasteForm').classList.toggle('active', which==='paste');
+  document.getElementById('uploadForm').classList.toggle('active', which==='upload');
+}
+
+// ── Init ────────────────────────────────────────────────
+loadApp();
+</script>
+</body>
+  </html>
