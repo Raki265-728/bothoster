@@ -9,28 +9,36 @@ import subprocess, threading, ast, importlib, logging, secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
-# ── Auto-install ────────────────────────────────────────
+# ── Auto-install required packages ──────────────────────
 def _ensure(pkgs):
     for pip_name, imp in pkgs:
-        try: __import__(imp)
+        try:
+            __import__(imp)
         except ImportError:
             print(f"📦 Installing {pip_name}...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name, "--quiet"])
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", pip_name, "--quiet"]
+            )
 
-_ensure([("Flask","flask"),("Werkzeug","werkzeug"),("psutil","psutil")])
+_ensure([
+    ("Flask", "flask"),
+    ("Werkzeug", "werkzeug"),
+    ("psutil", "psutil"),
+])
 
 from flask import (Flask, request, jsonify, session, redirect, url_for,
-                   send_from_directory, Response)
+                   send_from_directory)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import psutil
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger("bothoster")
 
 # ── Paths ───────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_DIR = os.environ.get("DATA_DIR", os.path.join(BASE_DIR, "data"))
 BOTS_DIR = os.path.join(DATA_DIR, "bots")
 LOGS_DIR = os.path.join(DATA_DIR, "logs")
 TEMP_DIR = os.path.join(DATA_DIR, "temp")
@@ -47,7 +55,7 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 
-# ── DB ──────────────────────────────────────────────────
+# ── Database ────────────────────────────────────────────
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 conn.row_factory = sqlite3.Row
 dblock = threading.Lock()
@@ -78,41 +86,100 @@ init_db()
 procs = {}
 plock = threading.Lock()
 
-# ── File type / extract / find ──────────────────────────
+# ══════════════════════════════════════════════════════════
+#  FILE HELPERS
+# ══════════════════════════════════════════════════════════
 def get_file_type(fn):
     if not fn: return "unknown"
     n = fn.lower()
     if n.endswith(".py"): return "python"
     if n.endswith(".js"): return "javascript"
     if n.endswith(".zip"): return "zip"
-    if any(n.endswith(e) for e in [".tar",".tar.gz",".tgz"]): return "archive"
+    if any(n.endswith(e) for e in [".tar", ".tar.gz", ".tgz"]): return "archive"
     return "unknown"
 
 def extract_archive(path, out):
     try:
         if path.lower().endswith(".zip"):
-            with zipfile.ZipFile(path) as z: z.extractall(out)
-        elif path.lower().endswith((".tar.gz",".tgz")):
-            with tarfile.open(path,"r:gz") as t: t.extractall(out)
+            with zipfile.ZipFile(path) as z:
+                z.extractall(out)
+        elif path.lower().endswith((".tar.gz", ".tgz")):
+            with tarfile.open(path, "r:gz") as t:
+                t.extractall(out)
         elif path.lower().endswith(".tar"):
-            with tarfile.open(path,"r") as t: t.extractall(out)
-        else: return False, "Unsupported"
+            with tarfile.open(path, "r") as t:
+                t.extractall(out)
+        else:
+            return False, "Unsupported archive"
         return True, None
-    except Exception as e: return False, str(e)
+    except Exception as e:
+        return False, str(e)
 
 def find_main_file(d):
-    priority = ["main.py","bot.py","app.py","server.py","index.py",
-                "main.js","bot.js","app.js","index.js"]
+    priority = ["main.py", "bot.py", "app.py", "server.py", "index.py",
+                "main.js", "bot.js", "app.js", "index.js"]
     for f in priority:
-        p = os.path.join(d,f)
+        p = os.path.join(d, f)
         if os.path.isfile(p): return p
-    for root,_,files in os.walk(d):
+    for root, _, files in os.walk(d):
         for f in priority:
-            if f in files: return os.path.join(root,f)
-    for root,_,files in os.walk(d):
+            if f in files: return os.path.join(root, f)
+    for root, _, files in os.walk(d):
         for f in files:
-            if f.endswith((".py",".js")): return os.path.join(root,f)
+            if f.endswith((".py", ".js")): return os.path.join(root, f)
     return None
+
+# ══════════════════════════════════════════════════════════
+#  DEPENDENCY INSTALLATION
+# ══════════════════════════════════════════════════════════
+PIP_MAP = {
+    "telebot": "pyTelegramBotAPI",
+    "telegram": "python-telegram-bot",
+    "PIL": "Pillow",
+    "cv2": "opencv-python",
+    "Crypto": "pycryptodome",
+    "bs4": "beautifulsoup4",
+    "dotenv": "python-dotenv",
+    "yaml": "PyYAML",
+    "aiogram": "aiogram",
+    "telethon": "Telethon",
+    "discord": "discord.py",
+    "requests": "requests",
+    "aiohttp": "aiohttp",
+    "httpx": "httpx",
+    "flask": "Flask",
+    "fastapi": "fastapi",
+    "uvicorn": "uvicorn",
+    "pandas": "pandas",
+    "numpy": "numpy",
+    "openai": "openai",
+    "gtts": "gTTS",
+    "pydub": "pydub",
+    "psutil": "psutil",
+    "pymongo": "pymongo",
+    "sqlalchemy": "SQLAlchemy",
+    "redis": "redis",
+    "pyrogram": "pyrogram",
+    "tgcrypto": "TgCrypto",
+    "moviepy": "moviepy",
+    "pytz": "pytz",
+    "emoji": "emoji",
+    "urllib3": "urllib3",
+    "certifi": "certifi",
+    "mysql": "mysql-connector-python",
+    "psycopg2": "psycopg2-binary",
+    "PIL.Image": "Pillow",
+}
+
+def uninstall_fake_telegram():
+    """Remove the fake 'telegram' package if installed."""
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "uninstall", "-y", "telegram"],
+            capture_output=True, timeout=30
+        )
+    except Exception:
+        pass
 
 def install_requirements_file(path):
     if not os.path.exists(path): return
@@ -120,9 +187,12 @@ def install_requirements_file(path):
         pkgs = [l.strip() for l in f if l.strip() and not l.startswith("#")]
     for pkg in pkgs:
         try:
-            subprocess.run([sys.executable,"-m","pip","install",pkg,"--quiet"],
-                           capture_output=True, timeout=180)
-        except: pass
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", pkg, "--quiet"],
+                capture_output=True, timeout=300
+            )
+        except Exception:
+            pass
 
 def extract_imports(fp):
     imps = set()
@@ -131,26 +201,47 @@ def extract_imports(fp):
             tree = ast.parse(f.read())
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for a in node.names: imps.add(a.name.split(".")[0])
-            elif isinstance(node, ast.ImportFrom) and node.module and node.level==0:
+                for a in node.names:
+                    imps.add(a.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
                 imps.add(node.module.split(".")[0])
-    except: pass
+    except Exception:
+        pass
     return imps
 
-def install_missing_imports(imps):
-    map_pip = {"telebot":"pyTelegramBotAPI","PIL":"Pillow","cv2":"opencv-python",
-               "Crypto":"pycryptodome","bs4":"beautifulsoup4","dotenv":"python-dotenv",
-               "yaml":"PyYAML","aiogram":"aiogram","telethon":"Telethon"}
-    for m in imps:
-        try: importlib.import_module(m); continue
-        except ImportError: pass
-        pip_name = map_pip.get(m, m)
-        try:
-            subprocess.run([sys.executable,"-m","pip","install",pip_name,"--quiet"],
-                           capture_output=True, timeout=180)
-        except: pass
+def install_missing_imports(imports):
+    # ⚠️ First remove the fake 'telegram' package
+    uninstall_fake_telegram()
 
-# ── Bot runner ──────────────────────────────────────────
+    missing = []
+    for m in imports:
+        try:
+            importlib.import_module(m)
+        except ImportError:
+            missing.append(m)
+
+    if not missing:
+        return True, "All available"
+
+    ok = fail = 0
+    for m in missing:
+        pip_name = PIP_MAP.get(m, m)
+        try:
+            r = subprocess.run(
+                [sys.executable, "-m", "pip", "install", pip_name, "--quiet"],
+                capture_output=True, text=True, timeout=300
+            )
+            if r.returncode == 0:
+                ok += 1
+            else:
+                fail += 1
+        except Exception:
+            fail += 1
+    return fail == 0, f"Installed {ok}, failed {fail}"
+
+# ══════════════════════════════════════════════════════════
+#  BOT PROCESS MANAGEMENT
+# ══════════════════════════════════════════════════════════
 def start_bot_process(bot_id, code_path, log_path, env_extra=None):
     with plock:
         if bot_id in procs and procs[bot_id].poll() is None:
@@ -159,44 +250,58 @@ def start_bot_process(bot_id, code_path, log_path, env_extra=None):
     ext = os.path.splitext(code_path)[1].lower()
     workdir = os.path.dirname(code_path)
 
-    # install deps
     if ext == ".py":
+        # Remove fake telegram BEFORE installing
+        uninstall_fake_telegram()
+
         req = os.path.join(workdir, "requirements.txt")
         install_requirements_file(req)
-        imps = extract_imports(code_path)
-        install_missing_imports(imps)
 
-    if ext == ".py":    cmd = [sys.executable, "-u", code_path]
-    elif ext == ".js":  cmd = ["node", code_path]
-    else:               return False, f"Unsupported: {ext}"
+        imps = extract_imports(code_path)
+        if imps:
+            install_missing_imports(imps)
+
+    if ext == ".py":
+        cmd = [sys.executable, "-u", code_path]
+    elif ext == ".js":
+        cmd = ["node", code_path]
+    else:
+        return False, f"Unsupported: {ext}"
 
     env = os.environ.copy()
-    if env_extra: env.update({k:str(v) for k,v in env_extra.items()})
+    if env_extra:
+        env.update({k: str(v) for k, v in env_extra.items()})
 
     log_f = open(log_path, "a")
     log_f.write(f"\n{'='*50}\n▶ START {datetime.utcnow().isoformat()}\n{'='*50}\n")
     log_f.flush()
 
     try:
-        proc = subprocess.Popen(cmd, stdout=log_f, stderr=subprocess.STDOUT,
-                                cwd=workdir, env=env, text=True)
+        proc = subprocess.Popen(
+            cmd, stdout=log_f, stderr=subprocess.STDOUT,
+            cwd=workdir, env=env, text=True
+        )
     except Exception as e:
         log_f.close()
         return False, f"Failed: {e}"
 
-    with plock: procs[bot_id] = proc
+    with plock:
+        procs[bot_id] = proc
 
     def watch():
         try:
             code = proc.wait()
         finally:
-            with plock: procs.pop(bot_id, None)
+            with plock:
+                procs.pop(bot_id, None)
             try:
                 with dblock:
                     c = conn.cursor()
-                    c.execute("UPDATE bots SET status='stopped', pid=NULL WHERE id=?", (bot_id,))
+                    c.execute("UPDATE bots SET status='stopped', pid=NULL WHERE id=?",
+                              (bot_id,))
                     conn.commit()
-            except: pass
+            except Exception:
+                pass
             log_f.write(f"\n■ EXIT code={code} {datetime.utcnow().isoformat()}\n")
             log_f.close()
 
@@ -208,8 +313,10 @@ def stop_bot_process(bot_id):
         proc = procs.pop(bot_id, None)
     if proc and proc.poll() is None:
         proc.terminate()
-        try: proc.wait(timeout=5)
-        except subprocess.TimeoutExpired: proc.kill()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 def is_running(bot_id):
     with plock:
@@ -223,27 +330,32 @@ def read_logs(log_path, lines=300):
     except FileNotFoundError:
         return "(no logs yet)"
 
-# ── Auth decorator ──────────────────────────────────────
+# ══════════════════════════════════════════════════════════
+#  AUTH
+# ══════════════════════════════════════════════════════════
 def login_required(f):
     @wraps(f)
     def w(*a, **k):
         if "uid" not in session:
-            return jsonify(error="Not authenticated", ok=False), 401
+            return jsonify(ok=False, error="Not authenticated"), 401
         return f(*a, **k)
     return w
 
-# ── Frontend (serve index.html) ─────────────────────────
+# ══════════════════════════════════════════════════════════
+#  ROUTES
+# ══════════════════════════════════════════════════════════
 @app.route("/")
 def index():
     return send_from_directory(BASE_DIR, "index.html")
 
-# ── Auth routes ─────────────────────────────────────────
 @app.route("/api/signup", methods=["POST"])
 def signup():
     email = (request.form.get("email") or "").strip().lower()
-    pw    = request.form.get("password") or ""
-    if not email or not pw: return jsonify(ok=False, error="Missing fields")
-    if len(pw) < 6: return jsonify(ok=False, error="Password min 6 chars")
+    pw = request.form.get("password") or ""
+    if not email or not pw:
+        return jsonify(ok=False, error="Missing fields")
+    if len(pw) < 6:
+        return jsonify(ok=False, error="Password min 6 chars")
     try:
         with dblock:
             c = conn.cursor()
@@ -261,7 +373,7 @@ def signup():
 @app.route("/api/login", methods=["POST"])
 def login():
     email = (request.form.get("email") or "").strip().lower()
-    pw    = request.form.get("password") or ""
+    pw = request.form.get("password") or ""
     row = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
     if not row or not check_password_hash(row["password_hash"], pw):
         return jsonify(ok=False, error="Invalid email or password")
@@ -277,26 +389,30 @@ def logout():
 
 @app.route("/api/me")
 def me():
-    if "uid" not in session: return jsonify(ok=False)
+    if "uid" not in session:
+        return jsonify(ok=False)
     return jsonify(ok=True, email=session["email"], uid=session["uid"])
 
-# ── Stats ───────────────────────────────────────────────
 @app.route("/api/stats")
 @login_required
 def stats():
-    rows = conn.execute("SELECT id,status FROM bots WHERE user_id=?", (session["uid"],)).fetchall()
+    rows = conn.execute("SELECT id,status FROM bots WHERE user_id=?",
+                        (session["uid"],)).fetchall()
     total = len(rows)
     running = sum(1 for r in rows if is_running(r["id"]))
-    try: cpu = psutil.cpu_percent(interval=0.1)
-    except: cpu = 0
-    return jsonify(ok=True, total=total, running=running, stopped=total-running, cpu=cpu)
+    try:
+        cpu = psutil.cpu_percent(interval=0.1)
+    except Exception:
+        cpu = 0
+    return jsonify(ok=True, total=total, running=running,
+                   stopped=total - running, cpu=cpu)
 
-# ── List bots ───────────────────────────────────────────
 @app.route("/api/bots")
 @login_required
 def list_bots():
-    rows = conn.execute("SELECT * FROM bots WHERE user_id=? ORDER BY created_at DESC",
-                        (session["uid"],)).fetchall()
+    rows = conn.execute(
+        "SELECT * FROM bots WHERE user_id=? ORDER BY created_at DESC",
+        (session["uid"],)).fetchall()
     bots = []
     for r in rows:
         bots.append({
@@ -305,7 +421,6 @@ def list_bots():
         })
     return jsonify(ok=True, bots=bots)
 
-# ── Deploy (paste) ──────────────────────────────────────
 @app.route("/api/deploy", methods=["POST"])
 @login_required
 def deploy():
@@ -326,7 +441,8 @@ def deploy():
     os.makedirs(user_dir, exist_ok=True)
 
     code_path = os.path.join(user_dir, "main.py")
-    with open(code_path, "w") as f: f.write(code)
+    with open(code_path, "w") as f:
+        f.write(code)
     log_path = os.path.join(LOGS_DIR, f"{bot_id}.log")
 
     with dblock:
@@ -338,24 +454,25 @@ def deploy():
                    code_path, log_path, "python", datetime.utcnow().isoformat()))
         conn.commit()
 
-    ok, msg = start_bot_process(bot_id, code_path, log_path,
-                                 env_extra={"BOT_TOKEN": token, "ADMIN_CHAT_ID": chat_id})
+    ok, msg = start_bot_process(
+        bot_id, code_path, log_path,
+        env_extra={"BOT_TOKEN": token, "ADMIN_CHAT_ID": chat_id}
+    )
     if ok:
         conn.execute("UPDATE bots SET status='running' WHERE id=?", (bot_id,))
         conn.commit()
         return jsonify(ok=True, bot_id=bot_id)
     return jsonify(ok=False, error=msg)
 
-# ── Upload ──────────────────────────────────────────────
 @app.route("/api/upload", methods=["POST"])
 @login_required
 def upload():
     if "file" not in request.files:
         return jsonify(ok=False, error="No file")
     f = request.files["file"]
-    token   = (request.form.get("token") or "").strip()
+    token = (request.form.get("token") or "").strip()
     chat_id = (request.form.get("chat_id") or "").strip()
-    name    = (request.form.get("name") or f.filename).strip()
+    name = (request.form.get("name") or f.filename).strip()
 
     if not re.match(r"^\d+:[A-Za-z0-9_-]{30,}$", token):
         return jsonify(ok=False, error="Invalid token")
@@ -373,10 +490,12 @@ def upload():
     ftype = get_file_type(fname)
     if ftype in ("zip", "archive"):
         ok, err = extract_archive(tmp, user_dir)
-        if not ok: return jsonify(ok=False, error=f"Extract failed: {err}")
+        if not ok:
+            return jsonify(ok=False, error=f"Extract failed: {err}")
         os.remove(tmp)
         main = find_main_file(user_dir)
-        if not main: return jsonify(ok=False, error="No main .py/.js in archive")
+        if not main:
+            return jsonify(ok=False, error="No main .py/.js in archive")
         code_path = main
         ftype = get_file_type(main)
     elif ftype in ("python", "javascript"):
@@ -397,15 +516,16 @@ def upload():
                    code_path, log_path, ftype, datetime.utcnow().isoformat()))
         conn.commit()
 
-    ok, msg = start_bot_process(bot_id, code_path, log_path,
-                                 env_extra={"BOT_TOKEN": token, "ADMIN_CHAT_ID": chat_id})
+    ok, msg = start_bot_process(
+        bot_id, code_path, log_path,
+        env_extra={"BOT_TOKEN": token, "ADMIN_CHAT_ID": chat_id}
+    )
     if ok:
         conn.execute("UPDATE bots SET status='running' WHERE id=?", (bot_id,))
         conn.commit()
         return jsonify(ok=True, bot_id=bot_id)
     return jsonify(ok=False, error=msg)
 
-# ── Bot controls ────────────────────────────────────────
 def own_bot(bot_id):
     return conn.execute("SELECT * FROM bots WHERE id=? AND user_id=?",
                         (bot_id, session["uid"])).fetchone()
@@ -415,8 +535,9 @@ def own_bot(bot_id):
 def api_start(bot_id):
     row = own_bot(bot_id)
     if not row: return jsonify(ok=False, error="Not found")
-    ok, msg = start_bot_process(bot_id, row["code_path"], row["log_path"],
-                                 env_extra={"BOT_TOKEN": row["token"], "ADMIN_CHAT_ID": row["chat_id"]})
+    ok, msg = start_bot_process(
+        bot_id, row["code_path"], row["log_path"],
+        env_extra={"BOT_TOKEN": row["token"], "ADMIN_CHAT_ID": row["chat_id"]})
     if ok:
         conn.execute("UPDATE bots SET status='running' WHERE id=?", (bot_id,))
         conn.commit()
@@ -439,8 +560,9 @@ def api_restart(bot_id):
     if not row: return jsonify(ok=False, error="Not found")
     stop_bot_process(bot_id)
     time.sleep(1)
-    ok, msg = start_bot_process(bot_id, row["code_path"], row["log_path"],
-                                 env_extra={"BOT_TOKEN": row["token"], "ADMIN_CHAT_ID": row["chat_id"]})
+    ok, msg = start_bot_process(
+        bot_id, row["code_path"], row["log_path"],
+        env_extra={"BOT_TOKEN": row["token"], "ADMIN_CHAT_ID": row["chat_id"]})
     if ok:
         conn.execute("UPDATE bots SET status='running' WHERE id=?", (bot_id,))
         conn.commit()
@@ -453,8 +575,10 @@ def api_delete(bot_id):
     row = own_bot(bot_id)
     if not row: return jsonify(ok=False, error="Not found")
     stop_bot_process(bot_id)
-    try: shutil.rmtree(os.path.dirname(row["code_path"]), ignore_errors=True)
-    except: pass
+    try:
+        shutil.rmtree(os.path.dirname(row["code_path"]), ignore_errors=True)
+    except Exception:
+        pass
     conn.execute("DELETE FROM bots WHERE id=?", (bot_id,))
     conn.commit()
     return jsonify(ok=True)
@@ -466,7 +590,9 @@ def api_logs(bot_id):
     if not row: return jsonify(ok=False, error="Not found")
     return jsonify(ok=True, logs=read_logs(row["log_path"], 300))
 
-# ── Run ─────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════
+#  MAIN
+# ══════════════════════════════════════════════════════════
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n{'='*55}\n🤖 BotHoster → http://localhost:{port}\n{'='*55}\n")
